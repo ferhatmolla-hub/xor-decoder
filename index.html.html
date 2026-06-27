@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XOR Kod Çözücü</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #06080F;
+  --surface:    #0C1018;
+  --surface-2:  #111621;
+  --border:     rgba(255,255,255,0.06);
+  --border-hi:  rgba(255,255,255,0.11);
+  --cyan:       #00C8F0;
+  --violet:     #7C6AF5;
+  --text:       #CBD5E1;
+  --text-dim:   #64748B;
+  --text-bright:#F1F5F9;
+  --red:        #FC6D6D;
+  --green:      #34D399;
+  --mono:       'Courier New', 'Lucida Console', monospace;
+  --sans:       -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+html, body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+.glow-a, .glow-b {
+  position: fixed; border-radius: 50%;
+  filter: blur(130px); pointer-events: none; z-index: 0;
+}
+.glow-a { width: 560px; height: 360px; background: var(--cyan);   opacity: 0.065; top: -120px; left: -180px; }
+.glow-b { width: 480px; height: 380px; background: var(--violet); opacity: 0.075; bottom: -90px; right: -140px; }
+
+.page {
+  position: relative; z-index: 1;
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 48px 20px;
+}
+
+.card {
+  width: 100%; max-width: 500px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.03) inset,
+    0 32px 80px rgba(0,0,0,0.72),
+    0 0 60px rgba(0,0,0,0.4);
+}
+
+.card-stripe {
+  height: 3px;
+  background: linear-gradient(90deg, var(--cyan) 0%, var(--violet) 100%);
+}
+
+.card-body { padding: 36px 32px 32px; }
+
+/* Header */
+.hd { text-align: center; margin-bottom: 32px; }
+.hd-chip {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--cyan);
+  border: 1px solid rgba(0,200,240,0.22);
+  border-radius: 4px; padding: 3px 10px; margin-bottom: 16px;
+  background: rgba(0,200,240,0.06);
+}
+.hd-title {
+  font-size: 26px; font-weight: 700;
+  color: var(--text-bright); letter-spacing: -0.5px; margin-bottom: 6px;
+}
+.hd-sub { font-size: 13px; color: var(--text-dim); }
+
+.rule { height: 1px; background: var(--border); margin: 28px 0; }
+
+/* Input */
+.field-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-dim); margin-bottom: 8px;
+}
+.field-wrap { position: relative; }
+.field-prefix {
+  position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
+  font-family: var(--mono); font-size: 15px; color: var(--text-dim);
+  pointer-events: none; user-select: none;
+}
+.field-input {
+  width: 100%; background: var(--surface-2);
+  border: 1px solid var(--border-hi); border-radius: 10px;
+  padding: 14px 14px 14px 34px;
+  font-family: var(--mono); font-size: 22px; font-weight: 700;
+  color: var(--text-bright); outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  letter-spacing: 0.02em; caret-color: var(--cyan);
+}
+.field-input::placeholder { color: #222C3C; font-weight: 400; font-size: 15px; letter-spacing: 0; }
+.field-input:focus {
+  border-color: rgba(0,200,240,0.35); background: #0E1420;
+  box-shadow: 0 0 0 3px rgba(0,200,240,0.07), 0 1px 8px rgba(0,0,0,0.3);
+}
+
+.err {
+  display: none; align-items: center; gap: 8px;
+  margin-top: 9px; padding: 9px 13px;
+  background: rgba(252,109,109,0.07);
+  border: 1px solid rgba(252,109,109,0.2);
+  border-radius: 8px; font-size: 12.5px; font-weight: 500; color: var(--red);
+}
+.err.on { display: flex; }
+
+/* ─── BUTTONS ─────────────────────────────────── */
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }
+
+.xbtn {
+  position: relative; display: block;
+  border: none; border-radius: 13px; padding: 0;
+  cursor: pointer; outline: none; overflow: hidden;
+  transition: transform 0.15s cubic-bezier(.2,.8,.3,1), box-shadow 0.2s;
+  text-align: left;
+}
+.xbtn:hover  { transform: translateY(-3px) scale(1.015); }
+.xbtn:active { transform: translateY(0) scale(0.985); }
+.xbtn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+/* Gloss sweep */
+.xbtn::before {
+  content: ''; position: absolute; inset: 0; z-index: 3; border-radius: inherit;
+  background: linear-gradient(140deg, rgba(255,255,255,0.06) 0%, transparent 55%);
+  opacity: 0; transition: opacity 0.2s; pointer-events: none;
+}
+.xbtn:hover::before { opacity: 1; }
+
+.xbtn-inner { position: relative; z-index: 1; padding: 18px 16px 16px; }
+
+/* Cyan */
+.xbtn-c {
+  background: linear-gradient(160deg, #081D2E 0%, #081220 70%, #040C18 100%);
+  border: 1px solid rgba(0,200,240,0.18);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,200,240,0.05) inset, 0 0 22px rgba(0,200,240,0.04);
+}
+.xbtn-c:hover {
+  border-color: rgba(0,200,240,0.36);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,200,240,0.1) inset, 0 0 32px rgba(0,200,240,0.13);
+}
+
+/* Violet */
+.xbtn-v {
+  background: linear-gradient(160deg, #11092C 0%, #0C0720 70%, #070310 100%);
+  border: 1px solid rgba(124,106,245,0.18);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.55), 0 0 0 1px rgba(124,106,245,0.05) inset, 0 0 22px rgba(124,106,245,0.04);
+}
+.xbtn-v:hover {
+  border-color: rgba(124,106,245,0.36);
+  box-shadow: 0 12px 36px rgba(0,0,0,0.6), 0 0 0 1px rgba(124,106,245,0.1) inset, 0 0 32px rgba(124,106,245,0.13);
+}
+
+/* Icon badge */
+.xbtn-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+
+.xbtn-icon {
+  width: 36px; height: 36px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 12px; font-weight: 800;
+  letter-spacing: 0.02em; flex-shrink: 0;
+}
+.xbtn-c .xbtn-icon {
+  background: linear-gradient(135deg, rgba(0,200,240,0.18), rgba(0,200,240,0.06));
+  color: var(--cyan); border: 1px solid rgba(0,200,240,0.22);
+  box-shadow: 0 0 12px rgba(0,200,240,0.15);
+}
+.xbtn-v .xbtn-icon {
+  background: linear-gradient(135deg, rgba(124,106,245,0.18), rgba(124,106,245,0.06));
+  color: var(--violet); border: 1px solid rgba(124,106,245,0.22);
+  box-shadow: 0 0 12px rgba(124,106,245,0.15);
+}
+
+/* Status pill */
+.xbtn-pill {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; padding: 3px 7px; border-radius: 4px;
+}
+.xbtn-c .xbtn-pill { color: var(--cyan);   background: rgba(0,200,240,0.08);   border: 1px solid rgba(0,200,240,0.15); }
+.xbtn-v .xbtn-pill { color: var(--violet); background: rgba(124,106,245,0.08); border: 1px solid rgba(124,106,245,0.15); }
+
+.xbtn-name {
+  font-size: 15px; font-weight: 700;
+  color: var(--text-bright); letter-spacing: -0.2px; margin-bottom: 6px;
+}
+
+.xbtn-key {
+  display: flex; align-items: center; gap: 5px;
+  font-family: var(--mono); font-size: 11.5px; color: var(--text-dim);
+}
+.xbtn-op { font-size: 14px; font-weight: 700; }
+.xbtn-c .xbtn-op { color: var(--cyan); }
+.xbtn-v .xbtn-op { color: var(--violet); }
+
+/* Bottom accent bar */
+.xbtn-foot {
+  height: 2px; margin-top: 14px; border-radius: 2px;
+  opacity: 0.45; transition: opacity 0.2s;
+}
+.xbtn-c .xbtn-foot { background: linear-gradient(90deg, var(--cyan) 0%, transparent 100%); }
+.xbtn-v .xbtn-foot { background: linear-gradient(90deg, var(--violet) 0%, transparent 100%); }
+.xbtn:hover .xbtn-foot { opacity: 1; }
+
+/* ─── Result ──────────────────────────────────── */
+.result-wrap {
+  margin-top: 26px; opacity: 0; transform: translateY(8px);
+  transition: opacity 0.3s, transform 0.3s; pointer-events: none;
+}
+.result-wrap.on { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+.result-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.result-head-lbl {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-dim);
+}
+
+.copy-btn {
+  display: flex; align-items: center; gap: 5px;
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  color: var(--text-dim); background: var(--surface-2);
+  border: 1px solid var(--border-hi); border-radius: 6px;
+  padding: 4px 10px; cursor: pointer; outline: none;
+  transition: background 0.15s, color 0.15s;
+}
+.copy-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-bright); }
+.copy-btn.ok    { color: var(--green); border-color: rgba(52,211,153,0.25); }
+
+.result-box {
+  position: relative; background: var(--surface-2);
+  border: 1px solid var(--border-hi); border-radius: 12px;
+  padding: 24px 20px 18px; text-align: center; overflow: hidden;
+}
+#bc { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0.18; }
+
+.result-num {
+  position: relative;
+  font-family: var(--mono); font-size: 34px; font-weight: 700;
+  letter-spacing: 0.02em; word-break: break-all;
+  user-select: text; cursor: text; line-height: 1.1;
+}
+
+.result-pills { position: relative; display: flex; justify-content: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.pill {
+  font-family: var(--mono); font-size: 10px; color: var(--text-dim);
+  background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+  border-radius: 4px; padding: 3px 8px;
+}
+.pill b { color: var(--text); font-weight: 600; }
+
+.footer { margin-top: 24px; text-align: center; font-family: var(--mono); font-size: 10px; color: #1A2333; letter-spacing: 0.08em; }
+
+@media (max-width: 460px) {
+  .card-body { padding: 26px 16px 22px; }
+  .btn-row { grid-template-columns: 1fr; }
+  .result-num { font-size: 26px; }
+  .hd-title { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+
+<div class="glow-a"></div>
+<div class="glow-b"></div>
+
+<div class="page">
+  <div class="card">
+    <div class="card-stripe"></div>
+    <div class="card-body">
+
+      <div class="hd">
+        <div class="hd-chip">XOR · Bitsel İşlem</div>
+        <div class="hd-title">Kod Çözücü</div>
+        <div class="hd-sub">Sabit anahtarlı XOR hesaplama aracı</div>
+      </div>
+
+      <div class="rule"></div>
+
+      <div class="field-label">Sayı Giriniz</div>
+      <div class="field-wrap">
+        <span class="field-prefix">#</span>
+        <input class="field-input" id="inp" type="text"
+          placeholder="Örn: 2109451338"
+          inputmode="numeric" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="err" id="err">⚠&nbsp; Geçersiz giriş — yalnızca rakam kabul edilir.</div>
+
+      <div class="btn-row">
+
+        <button class="xbtn xbtn-c" onclick="calc(1)" aria-label="Sistem 1 ile hesapla">
+          <div class="xbtn-inner">
+            <div class="xbtn-head">
+              <div class="xbtn-icon">S1</div>
+              <div class="xbtn-pill">Sistem 1</div>
+            </div>
+            <div class="xbtn-name">1. Hesaplama</div>
+            <div class="xbtn-key">
+              <span class="xbtn-op">⊕</span> 377 214 708
+            </div>
+            <div class="xbtn-foot"></div>
+          </div>
+        </button>
+
+        <button class="xbtn xbtn-v" onclick="calc(2)" aria-label="Sistem 2 ile hesapla">
+          <div class="xbtn-inner">
+            <div class="xbtn-head">
+              <div class="xbtn-icon">S2</div>
+              <div class="xbtn-pill">Sistem 2</div>
+            </div>
+            <div class="xbtn-name">2. Hesaplama</div>
+            <div class="xbtn-key">
+              <span class="xbtn-op">⊕</span> 804 202 279
+            </div>
+            <div class="xbtn-foot"></div>
+          </div>
+        </button>
+
+      </div>
+
+      <div class="result-wrap" id="rw">
+        <div class="rule"></div>
+        <div class="result-head">
+          <div class="result-head-lbl">Sonuç</div>
+          <button class="copy-btn" id="cpb" onclick="copyRes()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            Kopyala
+          </button>
+        </div>
+        <div class="result-box">
+          <canvas id="bc"></canvas>
+          <div class="result-num" id="rnum"></div>
+          <div class="result-pills" id="rpills"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <div class="footer">A ⊕ K ⊕ K = A &nbsp;·&nbsp; XOR işlemi geri alınabilirdir</div>
+</div>
+
+<script>
+const KEYS   = { 1: 377214708n, 2: 804202279n };
+const COLORS = { 1: '#00C8F0',  2: '#7C6AF5'  };
+
+let curRes = '', raf = null, drops = [], col = '#00C8F0';
+
+const inp    = document.getElementById('inp');
+const errEl  = document.getElementById('err');
+const rw     = document.getElementById('rw');
+const rnum   = document.getElementById('rnum');
+const rpills = document.getElementById('rpills');
+const cpb    = document.getElementById('cpb');
+const cv     = document.getElementById('bc');
+const cx     = cv.getContext('2d');
+
+inp.addEventListener('input', () => { inp.value = inp.value.replace(/[^0-9]/g,''); errEl.classList.remove('on'); });
+inp.addEventListener('keydown', e => { if (e.key==='Enter') calc(1); });
+
+function calc(sys) {
+  const raw = inp.value.trim();
+  if (!raw) { errEl.classList.add('on'); return; }
+  errEl.classList.remove('on');
+  const res = BigInt(raw) ^ KEYS[sys];
+  curRes = res.toString(); col = COLORS[sys];
+  rnum.textContent = curRes; rnum.style.color = col;
+  const bits = res.toString(2).length;
+  const hex  = '0x' + res.toString(16).toUpperCase();
+  rpills.innerHTML =
+    `<span class="pill">BIT <b>${bits}</b></span>` +
+    `<span class="pill">HEX <b>${hex}</b></span>` +
+    `<span class="pill">SİSTEM <b>${sys}</b></span>`;
+  cpb.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Kopyala`;
+  cpb.classList.remove('ok');
+  rw.classList.add('on');
+  startCanvas();
+}
+
+function copyRes() {
+  if (!curRes) return;
+  navigator.clipboard.writeText(curRes).then(() => {
+    cpb.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Kopyalandı`;
+    cpb.classList.add('ok');
+    setTimeout(() => {
+      cpb.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Kopyala`;
+      cpb.classList.remove('ok');
+    }, 2000);
+  });
+}
+
+function startCanvas() {
+  cv.width = cv.offsetWidth; cv.height = cv.offsetHeight;
+  const N = Math.floor(cv.width / 15);
+  drops = Array.from({length:N},(_,i)=>({
+    x:(i+0.5)*(cv.width/N), y:Math.random()*cv.height,
+    sp:0.4+Math.random()*0.9, ch:Math.random()>0.5?'1':'0',
+    t:0, iv:10+Math.floor(Math.random()*18)
+  }));
+  if (raf) cancelAnimationFrame(raf);
+  tick();
+}
+
+function tick() {
+  cx.fillStyle='rgba(11,16,24,0.22)'; cx.fillRect(0,0,cv.width,cv.height);
+  cx.font='9px Courier New,monospace'; cx.textAlign='center';
+  cx.fillStyle=col; cx.globalAlpha=0.65;
+  drops.forEach(d=>{
+    cx.fillText(d.ch,d.x,d.y); d.y+=d.sp;
+    if(++d.t>=d.iv){d.ch=Math.random()>0.5?'1':'0';d.t=0;}
+    if(d.y>cv.height){d.y=-10;d.sp=0.4+Math.random()*0.9;}
+  });
+  cx.globalAlpha=1; raf=requestAnimationFrame(tick);
+}
+
+window.addEventListener('resize',()=>{ if(rw.classList.contains('on')) startCanvas(); });
+</script>
+</body>
+</html>
